@@ -60,7 +60,14 @@ class _GaussianLikelihoodBase(Likelihood):
             missing = torch.isnan(target)
             target = settings.observation_nan_policy._fill_tensor(target)
 
-        mean, variance = input.mean, input.variance
+        if 'variance' in kwargs:
+            variance = kwargs.pop('variance')
+        else:
+            variance = input.variance
+
+        # mean, variance = input.mean, input.variance
+        mean = input.mean
+
         res = ((target - mean).square() + variance) / noise + noise.log() + math.log(2 * math.pi)
         res = res.mul(-0.5)
 

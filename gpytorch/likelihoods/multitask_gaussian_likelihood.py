@@ -121,7 +121,14 @@ class _MultitaskGaussianLikelihoodBase(_GaussianLikelihoodBase):
             return noise
 
         if self.rank == 0:
-            task_noises = self.raw_task_noises_constraint.transform(self.raw_task_noises)
+
+            # if multitask LL contains both multiple outputs and multiple states, index states
+            if 'state_idx' in kwargs:
+                state_idx = kwargs.pop('state_idx')
+                task_noises = self.raw_task_noises_constraint.transform(self.raw_task_noises[state_idx])
+            else:
+                task_noises = self.raw_task_noises_constraint.transform(self.raw_task_noises)
+                
             task_var_lt = DiagLinearOperator(task_noises)
             dtype, device = task_noises.dtype, task_noises.device
             ckl_init = KroneckerProductDiagLinearOperator

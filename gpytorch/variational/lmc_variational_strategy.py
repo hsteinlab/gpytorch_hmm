@@ -158,7 +158,30 @@ class LMCVariationalStrategy(_VariationalStrategy):
         return self.base_variational_strategy.variational_params_initialized
 
     def kl_divergence(self) -> Tensor:
-        return super().kl_divergence().sum(dim=self.latent_dim)
+        
+        kl = super().kl_divergence()
+
+        # return KL.sum(dim=self.latent_dim)
+        if 'weights' in kwargs and 'state_mat' in kwargs:
+            
+            # get state posteriors
+            weights = kwargs.pop('weights')
+            state_coef = weights.sum(axis=-1)/weights.size(-1) 
+
+            # get matrix that maps latents onto states
+            state_mat = kwargs.pop('state_mat')
+
+            # sum over state_specific latents and over number of states, div by number of data points and number of states
+            kl_sum = torch.tensor([kl[s>0].sum()*state_coef[si] 
+                                   for si,s in enumerate(state_mat)]).sum()/4 *self.latent_dim
+
+            # return KL, divided by number of states
+            return kl_sum
+
+        else:
+            return kl.sum(dim=self.latent_dim)
+        
+        # return super().kl_divergence().sum(dim=self.latent_dim)
 
     def __call__(
         self, x: Tensor, prior: bool = False, task_indices: Optional[LongTensor] = None, **kwargs

@@ -58,7 +58,46 @@ class VariationalELBO(_ApproximateMarginalLogLikelihood):
     """
 
     def _log_likelihood_term(self, variational_dist_f, target, **kwargs):
-        return self.likelihood.expected_log_prob(target, variational_dist_f, **kwargs).sum(-1)
+        
+        if 'weights' in kwargs and variational_dist_f.mean.size() != target.size():
+            # print('weighted log posterior')
+            # calculate a posterior-weighted log LL, rescaled by the sum of state posteriors
+            if 'n_states' in kwargs:
+                n_states = kwargs.pop('n_states')
+                n_dim = int(variational_dist_f.mean.size(1)/n_states)
+
+            else:
+                n_states = int(variational_dist_f.mean.size(1)/target.size(-1))
+                n_dim = target.size(-1)
+
+            weights = kwargs.pop('weights') # n_states x n_datapoints
+            variance = variational_dist_f.variance
+
+            # sum weighted logLL over states
+            logLL = 0
+            # calculate state-specific logLL by creating MultitaskMVNormal with 10 state-specific tasks
+            for s in range(n_states):
+
+                state_idx = torch.arange(s*n_dim,s*n_dim+n_dim)
+                # state_idx = torch.tensor([s])
+
+                # pass on for noise covar
+                kwargs['state_idx'] = state_idx
+
+                state_dist = variational_dist_f.__getitem__((..., state_idx))
+                # pass on variance so it doesn't have to be extracted again, since __getitem__ makes
+                # covar a SumLinearOperator instead of AddedDiagLinearOperator:
+                kwargs['variance'] = variance[..., state_idx]
+
+                loglikes = self.likelihood.expected_log_prob(target, state_dist, **kwargs)
+
+                state_term = (weights[s]*loglikes).sum()
+                
+                logLL += state_term
+
+            return logLL#/n_states
+        
+            # return self.likelihood.expected_log_prob(target, variational_dist_f, **kwargs).sum(-1)
 
     def forward(self, variational_dist_f, target, **kwargs):
         r"""

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from ._approximate_mll import _ApproximateMarginalLogLikelihood
-
+import torch
 
 class VariationalELBO(_ApproximateMarginalLogLikelihood):
     r"""
